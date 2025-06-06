@@ -75,7 +75,23 @@ async def main():
     # 创建客户端实例
     client = OpenAIWebRTCClient(
         api_key="your-api-key",
-        model="gpt-4o-realtime-preview-2024-12-17"
+        model="gpt-4o-realtime-preview-2024-12-17",
+        tools=[
+            {
+                "name": "display_color_palette",
+                "description": "Displays the colors palette",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "colors_hex": {
+                            "type": "string",
+                            "description": "Comma-separated list of color hex values"
+                        }
+                    },
+                    "required": ["colors_hex"]
+                }
+            }
+        ]
     )
 
     # 定义转录回调
@@ -104,7 +120,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-要使用客户端函数调用（Tools），可在 `on_event` 回调中处理 `session.created`、`response.done` 事件，并使用 `client.send_client_event()` 发送 `session.update` 或 `response.create` 消息，示例请参阅 `examples/basic_streaming.py`。
+要在初始化时添加 Tools（函数调用）支持，可向构造函数传递 `tools` 列表，客户端将在会话创建后自动发送 `session.update`（将 `tools` 和 `tool_choice` 嵌入到 `session` 字段中）注册这些工具。
+有关处理函数调用事件（如发起后续请求）的示例，请参阅 `examples/basic_streaming.py`。
+
 
 3. 运行示例：
 ```bash

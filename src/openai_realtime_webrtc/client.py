@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
 import sounddevice as sd
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 from .audio_handler import AudioHandler, SAMPLE_RATE, CHANNELS
@@ -42,7 +42,8 @@ class OpenAIWebRTCClient:
         model: str = "whisper-1",
         sample_rate: int = SAMPLE_RATE,
         channels: int = CHANNELS,
-        frame_duration: int = FRAME_DURATION_MS
+        frame_duration: int = FRAME_DURATION_MS,
+        tools: Optional[List[Dict[str, Any]]] = None,
     ):
         self.api_key = api_key
         self.model = model
@@ -64,6 +65,9 @@ class OpenAIWebRTCClient:
         self.data_channel: Optional[Any] = None
         # callback for incoming or sent events (session, responses, etc.)
         self.on_event: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.tools: Optional[List[Dict[str, Any]]] = tools
+        # current session info (set after session.created)
+        self.session: Optional[Dict[str, Any]] = None
 
     async def start_streaming(self):
         """Start the audio streaming session."""
@@ -155,6 +159,19 @@ class OpenAIWebRTCClient:
         except Exception:
             logger.warning(f"Received non-JSON message on data channel: {message}")
             return
+        # capture session info and auto-register tools if provided
+        if event.get("type") == "session.created":
+            # store session info
+            self.session = event.get("session")
+            # auto-register tools if provided (nested under session per API spec)
+            if self.tools:
+                self.send_client_event({
+                    "type": "session.update",
+                    "session": {
+                        "tools": self.tools,
+                        "tool_choice": "auto",
+                    },
+                })
         if self.on_event:
             self.on_event(event)
 

@@ -25,13 +25,36 @@ async def main():
     print(f"Channels: {CHANNELS} (Mono)")
     print(f"Bit Depth: {DTYPE} (16-bit)")
 
-    # Create client instance
+    # Create client instance with tool definitions (will be registered automatically)
     client = OpenAIWebRTCClient(
         api_key=api_key,
         model="gpt-4o-realtime-preview-2024-12-17",
         sample_rate=SAMPLE_RATE,
         channels=CHANNELS,
-        frame_duration=20
+        frame_duration=20,
+        tools=[
+            {
+                "type": "function",
+                "name": "display_color_palette",
+                "description": "Call this function when a user asks for a color palette.",
+                "parameters": {
+                    "type": "object",
+                    "strict": True,
+                    "properties": {
+                        "theme": {
+                            "type": "string",
+                            "description": "Description of the theme for the color scheme."
+                        },
+                        "colors": {
+                            "type": "array",
+                            "description": "Array of five hex color codes based on the theme.",
+                            "items": {"type": "string", "description": "Hex color code"}
+                        },
+                    },
+                    "required": ["theme", "colors"],
+                },
+            }
+        ]
     )
 
     # Define transcription callback
@@ -40,49 +63,9 @@ async def main():
 
     client.on_transcription = on_transcription
 
-    # Prepare tool (function) definition for display_color_palette
-    function_description = (
-        "Call this function when a user asks for a color palette."
-    )
-    session_update = {
-        "type": "session.update",
-        "session": {
-            "tools": [
-                {
-                    "type": "function",
-                    "name": "display_color_palette",
-                    "description": function_description,
-                    "parameters": {
-                        "type": "object",
-                        "strict": True,
-                        "properties": {
-                            "theme": {
-                                "type": "string",
-                                "description": "Description of the theme for the color scheme.",
-                            },
-                            "colors": {
-                                "type": "array",
-                                "description": "Array of five hex color codes based on the theme.",
-                                "items": {"type": "string", "description": "Hex color code"},
-                            },
-                        },
-                        "required": ["theme", "colors"],
-                    },
-                },
-            ],
-            "tool_choice": "auto",
-        },
-    }
-    function_added = False
-
     # Handle client and server events over the data channel
     def on_event(event: dict):
-        nonlocal function_added
         print(f"Event: {event}")
-        # send tools in session.update after session.created
-        if not function_added and event.get("type") == "session.created":
-            client.send_client_event(session_update)
-            function_added = True
         # handle function_call outputs
         if event.get("type") == "response.done" and event.get("response", {}).get("output"):
             for output in event["response"]["output"]:

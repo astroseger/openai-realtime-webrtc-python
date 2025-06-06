@@ -84,10 +84,15 @@ async def main():
 
     client.on_transcription = on_transcription
 
+    # 定义事件回调（可用于工具/函数调用）
+    def on_event(event: dict):
+        print(f"Event: {event}")
+
+    client.on_event = on_event
+
     try:
         # 开始流式传输
         await client.start_streaming()
-        
         # 保持连接
         while True:
             await asyncio.sleep(1)
@@ -98,6 +103,8 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+要使用客户端函数调用（Tools），可在 `on_event` 回调中处理 `session.created`、`response.done` 事件，并使用 `client.send_client_event()` 发送 `session.update` 或 `response.create` 消息，示例请参阅 `examples/basic_streaming.py`。
 
 3. 运行示例：
 ```bash

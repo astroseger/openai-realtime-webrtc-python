@@ -4,34 +4,34 @@ import av
 
 def numpy_to_audioframe(array, sample_rate=48000):
     """
-    将Numpy数组转换为PyAV AudioFrame
+    Convert a Numpy array to a PyAV AudioFrame
 
-    参数:
-        array: shape为(960, 1)的numpy数组, dtype为int16
-        sample_rate: 采样率,默认48000Hz
+    Parameters:
+        array: numpy array of shape (960, 1) and dtype int16
+        sample_rate: sample rate, default 48000Hz
 
-    返回:
-        av.AudioFrame: PyAV音频帧对象
+    Returns:
+        av.AudioFrame: PyAV AudioFrame object
     """
-    # 创建音频帧，指定正确的格式
+    # Create audio frame with correct format
     frame = av.AudioFrame(
-        samples=len(array),          # 采样点数
-        layout='mono',               # 单声道
-        format='s16',               # 有符号16位整数
+        samples=len(array),          # number of samples
+        layout='mono',               # mono
+        format='s16',               # signed 16-bit integer
     )
     frame.rate = sample_rate
     frame.pts = 0
 
-    # 确保数组是一维的
+    # Ensure the array is one-dimensional
     if array.ndim == 2:
         array = array.squeeze()
 
-    # 将数据复制到帧的平面中
+    # Copy data into frame plane
     frame.planes[0].update(array.tobytes())
 
     return frame
 
 
-# 使用示例
+# Example usage
 array = np.random.randint(-32768, 32767, (960, 1), dtype=np.int16)
 audio_frame = numpy_to_audioframe(array)

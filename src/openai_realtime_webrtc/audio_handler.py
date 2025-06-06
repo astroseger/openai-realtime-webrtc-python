@@ -82,10 +82,10 @@ class AudioHandler:
                 if status:
                     logger.warning(f"Audio input status: {status}")
                 if not self.is_paused:
-                    # 确保输入数据是正确的格式
+                    # Ensure input data has the correct format
                     audio_data = indata.copy()
 
-                    # 确保数据类型正确
+                    # Ensure correct data type
                     if audio_data.dtype != self.dtype:
                         if self.dtype == np.int16:
                             audio_data = (

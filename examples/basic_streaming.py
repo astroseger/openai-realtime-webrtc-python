@@ -1,11 +1,12 @@
 import asyncio
 import os
 import logging
+import json
 from dotenv import load_dotenv
 from openai_realtime_webrtc import OpenAIWebRTCClient
 from openai_realtime_webrtc.audio_handler import SAMPLE_RATE, CHANNELS, DTYPE
 
-# 设置日志级别
+# Set log level
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,13 +25,36 @@ async def main():
     print(f"Channels: {CHANNELS} (Mono)")
     print(f"Bit Depth: {DTYPE} (16-bit)")
 
-    # Create client instance
+    # Create client instance with tool definitions (will be registered automatically)
     client = OpenAIWebRTCClient(
         api_key=api_key,
         model="gpt-4o-realtime-preview-2024-12-17",
         sample_rate=SAMPLE_RATE,
         channels=CHANNELS,
-        frame_duration=20
+        frame_duration=20,
+        tools=[
+            {
+                "type": "function",
+                "name": "display_color_palette",
+                "description": "Call this function when a user asks for a color palette.",
+                "parameters": {
+                    "type": "object",
+                    "strict": True,
+                    "properties": {
+                        "theme": {
+                            "type": "string",
+                            "description": "Description of the theme for the color scheme."
+                        },
+                        "colors": {
+                            "type": "array",
+                            "description": "Array of five hex color codes based on the theme.",
+                            "items": {"type": "string", "description": "Hex color code"}
+                        },
+                    },
+                    "required": ["theme", "colors"],
+                },
+            }
+        ]
     )
 
     # Define transcription callback
@@ -38,6 +62,35 @@ async def main():
         print(f"Transcription: {text}")
 
     client.on_transcription = on_transcription
+
+    # Handle client and server events over the data channel
+    def on_event(event: dict):
+        print(f"Event: {event}")
+        # handle function_call outputs
+        if event.get("type") == "response.done" and event.get("response", {}).get("output"):
+            for output in event["response"]["output"]:
+                if output.get("type") == "function_call" and output.get("name") == "display_color_palette":
+                    args = json.loads(output.get("arguments", "{}"))
+                    print("--- Color Palette Tool Output ---")
+                    print(f"Theme: {args.get('theme')}")
+                    for color in args.get('colors', []):
+                        print(color)
+                    # follow-up: ask for feedback
+                    asyncio.create_task(delayed_feedback())
+
+    client.on_event = on_event
+
+    async def delayed_feedback():
+        await asyncio.sleep(0.5)
+        client.send_client_event({
+            "type": "response.create",
+            "response": {
+                "instructions": (
+                    "ask for feedback about the color palette - don't repeat "
+                    "the colors, just ask if they like the colors."
+                ),
+            },
+        })
 
     try:
         # Start streaming

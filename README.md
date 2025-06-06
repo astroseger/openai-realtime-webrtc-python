@@ -1,26 +1,26 @@
 # openai-realtime-webrtc-python
 
-基于WebRTC的OpenAI实时音频流通信Python库，支持与OpenAI Realtime API进行实时音频交互。
+# A Python library for real-time audio streaming with the OpenAI Realtime API over WebRTC.
 
-## 功能特点
+## Features
 
-- 基于WebRTC的实时音频通信
-- 支持OpenAI Realtime API
-- 自动音频设备管理
-- 自动采样率转换
-- 低延迟音频传输
-- 音频缓冲管理
-- 支持暂停/恢复流传输
+- Real-time audio communication over WebRTC
+- Support for OpenAI Realtime API
+- Automatic audio device management
+- Automatic sample rate conversion
+- Low-latency audio streaming
+- Audio buffering management
+- Pause/resume streaming support
 
 
 
-## 安装要求
+## Requirements
 
 - Python 3.7+
-- 支持的操作系统：Windows, macOS, Linux
-- 音频设备支持
+- Supported operating systems: Windows, macOS, Linux
+- Audio device support
 
-### 依赖项
+### Dependencies
 ```bash
 sounddevice>=0.4.6
 numpy>=1.24.0
@@ -33,73 +33,98 @@ aiortc>=1.6.0
 scipy>=1.12.0
 ```
 
-## 安装
+## Installation
 
-1. 克隆仓库：
+1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/openai-realtime-webrtc-python.git
 cd openai-realtime-webrtc-python
 ```
 
-2. 创建虚拟环境：
+2. Create a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
 
 ```
 
-3. 安装依赖：
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. 开发模式安装：
+4. Install in development mode:
 ```bash
 pip install -e .
 ```
 
-## 使用方法
+## Usage
 
-1. 设置环境变量：
-创建 `.env` 文件并添加您的OpenAI API密钥：
+1. Set up environment variables:
+Create a `.env` file and add your OpenAI API key:
 ```bash
 OPENAI_API_KEY=your-api-key-here
 ```
 
-2. 基本使用示例：
+2. Basic example:
 ```python
 import asyncio
 from openai_realtime_webrtc import OpenAIWebRTCClient
 
 async def main():
-    # 创建客户端实例
+    # Create client instance
     client = OpenAIWebRTCClient(
         api_key="your-api-key",
-        model="gpt-4o-realtime-preview-2024-12-17"
+        model="gpt-4o-realtime-preview-2024-12-17",
+        tools=[
+            {
+                "name": "display_color_palette",
+                "description": "Displays the colors palette",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "colors_hex": {
+                            "type": "string",
+                            "description": "Comma-separated list of color hex values"
+                        }
+                    },
+                    "required": ["colors_hex"]
+                }
+            }
+        ]
     )
 
-    # 定义转录回调
+    # Define transcription callback
     def on_transcription(text: str):
-        print(f"转录文本: {text}")
+        print(f"Transcription: {text}")
 
     client.on_transcription = on_transcription
 
+    # Define event callback (for tools/function calling)
+    def on_event(event: dict):
+        print(f"Event: {event}")
+
+    client.on_event = on_event
+
     try:
-        # 开始流式传输
+        # Start streaming
         await client.start_streaming()
-        
-        # 保持连接
+        # Keep the connection alive
         while True:
             await asyncio.sleep(1)
     except KeyboardInterrupt:
-        # 停止流式传输
+        # Stop streaming
         await client.stop_streaming()
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-3. 运行示例：
+To add support for tools (function calling) at initialization, pass a `tools` list to the constructor. The client will automatically send a `session.update` (embedding `tools` and `tool_choice` in the `session` field) on session creation to register these tools.
+For an example of handling function call events (e.g. for follow-up requests), see `examples/basic_streaming.py`.
+
+
+3. Run the example:
 ```bash
 python examples/basic_streaming.py
 ```
@@ -107,19 +132,18 @@ python examples/basic_streaming.py
 
 
 
-## 贡献指南
+## Contributing
+Pull requests and issues are welcome!
 
-欢迎提交 Pull Requests 和 Issues！
-
-## 许可证
+## License
 
 MIT License
 
-## 更新日志
+## Changelog
 
 ### v0.1.0
-- 初始版本发布
-- 实现基本的WebRTC音频流功能
-- 支持OpenAI Realtime API
-- 自动音频设备管理
-- 音频重采样支持
+- Initial release
+- Implement basic WebRTC audio streaming functionality
+- Support for OpenAI Realtime API
+- Automatic audio device management
+- Audio resampling support

@@ -1,18 +1,20 @@
 import asyncio
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any, List
 import sounddevice as sd
 from aiortc import RTCPeerConnection, RTCSessionDescription, MediaStreamTrack
 from .audio_handler import AudioHandler, SAMPLE_RATE, CHANNELS
 from .audio_output import FRAME_DURATION_MS
 from .webrtc_manager import WebRTCManager
-from typing import Optional, Deque, Dict, Tuple
+from typing import Deque, Dict, Tuple
+import json
+import uuid
 
 logger = logging.getLogger(__name__)
 
 
 def get_default_audio_info() -> Tuple[Dict, Dict]:
-    """获取默认音频设备的信息"""
+    """Get default audio device information."""
     try:
         input_device = sd.query_devices(kind='input')
         output_device = sd.query_devices(kind='output')
@@ -40,7 +42,8 @@ class OpenAIWebRTCClient:
         model: str = "whisper-1",
         sample_rate: int = SAMPLE_RATE,
         channels: int = CHANNELS,
-        frame_duration: int = FRAME_DURATION_MS
+        frame_duration: int = FRAME_DURATION_MS,
+        tools: Optional[List[Dict[str, Any]]] = None,
     ):
         self.api_key = api_key
         self.model = model
@@ -58,6 +61,13 @@ class OpenAIWebRTCClient:
         self.peer_connection: Optional[RTCPeerConnection] = None
         self.is_streaming = False
         self.on_transcription: Optional[Callable[[str], None]] = None
+        # data channel for sending/receiving Realtime API events
+        self.data_channel: Optional[Any] = None
+        # callback for incoming or sent events (session, responses, etc.)
+        self.on_event: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.tools: Optional[List[Dict[str, Any]]] = tools
+        # current session info (set after session.created)
+        self.session: Optional[Dict[str, Any]] = None
 
     async def start_streaming(self):
         """Start the audio streaming session."""
@@ -69,9 +79,13 @@ class OpenAIWebRTCClient:
             # Initialize WebRTC connection
             self.peer_connection = await self.webrtc_manager.create_connection()
 
-            # Add audio track
+            # Add audio track for microphone input
             audio_track = self.audio_handler.create_audio_track()
             self.peer_connection.addTransceiver(audio_track, "sendrecv")
+            # Create data channel for sending/receiving Realtime API events
+            self.data_channel = self.peer_connection.createDataChannel("oai-events")
+            self.data_channel.on("open", self._on_data_channel_open)
+            self.data_channel.on("message", self._on_data_channel_message)
 
             # Create and set local description
             offer = await self.peer_connection.createOffer()
@@ -134,3 +148,57 @@ class OpenAIWebRTCClient:
         """Handle incoming transcription."""
         if self.on_transcription:
             self.on_transcription(text)
+
+    def _on_data_channel_open(self):
+        logger.info("Data channel open")
+
+    def _on_data_channel_message(self, message: Any):
+        """Handle incoming JSON events from the data channel."""
+        try:
+            event = json.loads(message)
+        except Exception:
+            logger.warning(f"Received non-JSON message on data channel: {message}")
+            return
+        # capture session info and auto-register tools if provided
+        if event.get("type") == "session.created":
+            # store session info
+            self.session = event.get("session")
+            # auto-register tools if provided (nested under session per API spec)
+            if self.tools:
+                self.send_client_event({
+                    "type": "session.update",
+                    "session": {
+                        "tools": self.tools,
+                        "tool_choice": "auto",
+                    },
+                })
+        if self.on_event:
+            self.on_event(event)
+
+    def send_client_event(self, event: Dict[str, Any]) -> None:
+        """Send a client event over the data channel."""
+        if not self.data_channel or getattr(self.data_channel, 'readyState', None) != 'open':
+            logger.error("Failed to send message - data channel not available")
+            return
+        # assign event_id if missing
+        event_id = event.get('event_id') or str(uuid.uuid4())
+        event['event_id'] = event_id
+        self.data_channel.send(json.dumps(event))
+        # echo sent event to on_event callback
+        if self.on_event:
+            self.on_event(event)
+
+    def send_text_message(self, text: str) -> None:
+        """Send a text message to the model (conversation.item.create + response.create)."""
+        msg = {
+            'type': 'conversation.item.create',
+            'item': {
+                'type': 'message',
+                'role': 'user',
+                'content': [
+                    {'type': 'input_text', 'text': text}
+                ],
+            },
+        }
+        self.send_client_event(msg)
+        self.send_client_event({'type': 'response.create'})

@@ -110,8 +110,7 @@ class AudioOutput:
             # 从缓冲区获取数据
             if len(self._buffer) > 0:
                 data = self._buffer.popleft()
-                print(f"=========== data shape: {
-                      data.shape}, dtype: {data.dtype}")
+                print(f"=========== data shape: {data.shape}, dtype: {data.dtype}")
                 outdata[:] = data.reshape(outdata.shape)
             else:
                 # 如果缓冲区为空，输出静音

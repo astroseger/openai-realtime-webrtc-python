@@ -53,16 +53,14 @@ class WebRTCManager:
 
         @self.peer_connection.on("connectionstatechange")
         async def on_connectionstatechange():
-            logger.info(f"Connection state changed to: {
-                        self.peer_connection.connectionState}")
+            logger.info(f"Connection state changed to: {self.peer_connection.connectionState}")
             if self.peer_connection.connectionState == "failed":
                 if self.audio_output:
                     await self.audio_output.stop()
 
         @self.peer_connection.on("iceconnectionstatechange")
         async def on_iceconnectionstatechange():
-            logger.info(f"ICE connection state changed to: {
-                        self.peer_connection.iceConnectionState}")
+            logger.info(f"ICE connection state changed to: {self.peer_connection.iceConnectionState}")
 
         return self.peer_connection
 

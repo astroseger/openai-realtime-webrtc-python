@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 # Fixed audio configuration
 FRAME_DURATION_MS = 20  # WebRTC typically uses 20ms frames
-DEFAULT_SAMPLE_RATE = 48000  # 固定为48kHz
-DEFAULT_CHANNELS = 2    # 固定为单声道
+DEFAULT_SAMPLE_RATE = 48000  # Fixed at 48kHz
+DEFAULT_CHANNELS = 2    # Fixed to mono
 # 960 samples for 20ms at 48kHz
 DEFAULT_BLOCK_SIZE = int(DEFAULT_SAMPLE_RATE * FRAME_DURATION_MS / 1000)
 
@@ -30,7 +30,7 @@ class AudioOutput:
         max_queue_size: int = 50,
         device: Optional[str] = None
     ):
-        # 强制使用固定配置
+        # Enforce fixed configuration
         self.sample_rate = sample_rate
         self.channels = channels
         self.dtype = dtype
@@ -55,12 +55,12 @@ class AudioOutput:
             return
 
         try:
-            # 强制使用固定配置，但保持设备原生采样率以避免重采样
+            # Enforce fixed configuration but preserve device's native sample rate to avoid resampling
             self.stream = sd.OutputStream(
                 device=self.device,
                 samplerate=self.sample_rate,
-                channels=self.channels,  # 强制使用单声道
-                dtype=self.dtype,        # 强制使用16位
+                channels=self.channels,  # Force mono
+                dtype=self.dtype,        # Force 16-bit
                 blocksize=int(self.block_size),
                 callback=self._audio_callback,
                 prime_output_buffers_using_stream_callback=True
@@ -89,7 +89,7 @@ class AudioOutput:
                 self.stream.close()
                 self.stream = None
 
-            # 清空缓冲区
+            # Clear buffer
             self._buffer.clear()
             while not self._queue.empty():
                 try:
@@ -107,13 +107,13 @@ class AudioOutput:
             logger.warning(f"Audio output status: {status}")
 
         try:
-            # 从缓冲区获取数据
+                # Fetch data from buffer
             if len(self._buffer) > 0:
                 data = self._buffer.popleft()
                 print(f"=========== data shape: {data.shape}, dtype: {data.dtype}")
                 outdata[:] = data.reshape(outdata.shape)
             else:
-                # 如果缓冲区为空，输出静音
+                # If buffer is empty, output silence
                 outdata.fill(0)
         except Exception as e:
             logger.error(f"Error in audio callback: {str(e)}")
@@ -123,23 +123,23 @@ class AudioOutput:
         """Process audio frames from the queue and maintain the buffer."""
         try:
             while self.is_playing:
-                # 如果缓冲区未满，从队列获取新数据
+                # If buffer is not full, fetch new data from queue
                 if len(self._buffer) < self.max_queue_size:
                     try:
-                        # 非阻塞方式获取数据，超时0.1秒
+                        # Non-blocking fetch with 0.1s timeout
                         data = await asyncio.wait_for(self._queue.get(), 0.1)
                         self._buffer.append(data)
                     except asyncio.TimeoutError:
-                        # 超时继续循环
+                        # On timeout, continue loop
                         continue
                     except asyncio.QueueEmpty:
-                        # 队列为空继续循环
+                        # If queue is empty, continue loop
                         continue
                     except Exception as e:
                         logger.error(
                             f"Error getting data from queue: {str(e)}")
                 else:
-                    # 缓冲区已满，等待一小段时间
+                    # If buffer is full, wait briefly
                     await asyncio.sleep(0.001)
 
         except asyncio.CancelledError:
@@ -154,11 +154,11 @@ class AudioOutput:
 
             audio_data = frame.to_ndarray()
 
-            # 确保数据类型正确
+            # Ensure correct data type
             if audio_data.dtype != self.dtype:
                 audio_data = audio_data.astype(self.dtype)
 
-            # 如果队列已满，移除最旧的帧
+            # If queue is full, remove oldest frame
             if self._queue.qsize() >= self.max_queue_size:
                 try:
                     self._queue.get_nowait()

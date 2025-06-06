@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_default_audio_info() -> Tuple[Dict, Dict]:
-    """获取默认音频设备的信息"""
+    """Get default audio device information."""
     try:
         input_device = sd.query_devices(kind='input')
         output_device = sd.query_devices(kind='output')

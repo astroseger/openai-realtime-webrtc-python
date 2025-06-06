@@ -28,7 +28,7 @@ class WebRTCManager:
         config = RTCConfiguration(iceServers=self.ice_servers)
         self.peer_connection = RTCPeerConnection(config)
 
-        # 初始化音频输出
+        # Initialize audio output
         self.audio_output = AudioOutput()
         await self.audio_output.start()
 
@@ -83,7 +83,7 @@ class WebRTCManager:
 
         data = {
             "model": model,
-            "voice": "alloy"  # 默认使用 alloy 声音
+            "voice": "alloy"  # Use 'alloy' voice by default
         }
 
         try:
@@ -113,16 +113,16 @@ class WebRTCManager:
     ) -> Dict[str, Any]:
         """Connect to OpenAI's WebRTC endpoint using ephemeral token."""
         try:
-            # 1. 获取临时token
+            # 1. Get ephemeral token
             ephemeral_token = await self.get_ephemeral_token(api_key, model)
 
-            # 2. 使用临时token建立WebRTC连接
+            # 2. Establish WebRTC connection using ephemeral token
             headers = {
                 "Authorization": f"Bearer {ephemeral_token}",
                 "Content-Type": "application/sdp"
             }
 
-            # 3. 发送SDP offer并获取answer
+            # 3. Send SDP offer and receive answer
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.REALTIME_URL}?model={model}",

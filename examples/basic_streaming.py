@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai_realtime_webrtc import OpenAIWebRTCClient
 from openai_realtime_webrtc.audio_handler import SAMPLE_RATE, CHANNELS, DTYPE
 
-# 设置日志级别
+# Set log level
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
